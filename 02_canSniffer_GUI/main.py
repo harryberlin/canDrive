@@ -3,6 +3,7 @@
 #----------------------------------------------------------------
 import serial
 import canSniffer_ui
+from PyQt5 import QtCore, QtGui
 from PyQt5.QtWidgets import QMainWindow, QApplication, QTableWidgetItem, QHeaderView, QFileDialog, QRadioButton
 from PyQt5.QtWidgets import QVBoxLayout, QSizeGrip
 from PyQt5.QtCore import Qt
@@ -25,10 +26,13 @@ import FileLoader
 QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True) #enable highdpi scaling
 QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True) #use highdpi icons
 
+from APP_ICON import APP_ICON
+
 class canSnifferGUI(QMainWindow, canSniffer_ui.Ui_MainWindow):
     def __init__(self):
         super(canSnifferGUI, self).__init__()
         self.setupUi(self)
+        self.currentTheme = "Dark"
         self.portScanButton.clicked.connect(self.scanPorts)
         self.portConnectButton.clicked.connect(self.serialPortConnect)
         self.portDisconnectButton.clicked.connect(self.serialPortDisconnect)
@@ -331,12 +335,18 @@ class canSnifferGUI(QMainWindow, canSniffer_ui.Ui_MainWindow):
                         if self.highlightNewDataCheckBox.isChecked() and \
                                 self.groupModeCheckBox.isChecked() and \
                                 i > 4:
-                            newItem.setBackground(QColor(104, 37, 98))
+                            if self.currentTheme == "Dark":
+                                newItem.setBackground(QColor(104, 37, 98))
+                            else:
+                                newItem.setBackground(QColor(151, 218, 157))
                 else:
                     if self.highlightNewDataCheckBox.isChecked() and \
                             self.groupModeCheckBox.isChecked() and \
                             i > 4:
-                        newItem.setBackground(QColor(104, 37, 98))
+                        if self.currentTheme == "Dark":
+                            newItem.setBackground(QColor(104, 37, 98))
+                        else:
+                            newItem.setBackground(QColor(151, 218, 157))
             else:
                 newItem = QTableWidgetItem()
             self.mainMessageTableWidget.setItem(row, i, newItem)
@@ -346,7 +356,10 @@ class canSnifferGUI(QMainWindow, canSniffer_ui.Ui_MainWindow):
         if self.highlightNewIdCheckBox.isChecked():
             if newId not in self.idDict.keys():
                 for j in range(3):
-                    self.mainMessageTableWidget.item(row, j).setBackground(QColor(52, 44, 124))
+                    if self.currentTheme == "Dark":
+                        self.mainMessageTableWidget.item(row, j).setBackground(QColor(52, 44, 124))
+                    else:
+                        self.mainMessageTableWidget.item(row, j).setBackground(QColor(203, 211, 131))
 
         self.idDict[newId] = row
 
@@ -357,7 +370,10 @@ class canSnifferGUI(QMainWindow, canSniffer_ui.Ui_MainWindow):
 
         for i in range(self.mainMessageTableWidget.columnCount()):
             if (isFamiliar or (newId.find("(") >= 0)) and i < 3:
-                self.mainMessageTableWidget.item(row, i).setBackground(QColor(53, 81, 52))
+                if self.currentTheme == "Dark":
+                    self.mainMessageTableWidget.item(row, i).setBackground(QColor(53, 81, 52))
+                else:
+                    self.mainMessageTableWidget.item(row, i).setBackground(QColor(202, 174, 203))
 
             self.mainMessageTableWidget.item(row, i).setTextAlignment(Qt.AlignVCenter | Qt.AlignHCenter)
 
@@ -462,7 +478,7 @@ class canSnifferGUI(QMainWindow, canSniffer_ui.Ui_MainWindow):
     def serialPortConnect(self):
         try:
             self.serialController.port = self.portSelectorComboBox.currentText()
-            self.serialController.baudrate = 250000
+            self.serialController.baudrate = int(self.portBaudrateComboBox.currentText()) #250000
             self.serialController.open()
             self.serialReaderThread.start()
             self.serialWriterThread.start()
@@ -471,6 +487,8 @@ class canSnifferGUI(QMainWindow, canSniffer_ui.Ui_MainWindow):
             self.portConnectButton.setEnabled(False)
             self.startSniffingButton.setEnabled(True)
             self.stopSniffingButton.setEnabled(False)
+            self.portSelectorComboBox.setEnabled(False)
+            self.portBaudrateComboBox.setEnabled(False)
         except serial.SerialException as e:
             print('Error opening port: ' + str(e))
 
@@ -484,6 +502,8 @@ class canSnifferGUI(QMainWindow, canSniffer_ui.Ui_MainWindow):
             self.portConnectButton.setEnabled(True)
             self.startSniffingButton.setEnabled(False)
             self.serialConnectedCheckBox.setChecked(False)
+            self.portSelectorComboBox.setEnabled(True)
+            self.portBaudrateComboBox.setEnabled(True)
             self.serialController.close()
         except serial.SerialException as e:
             print('Error closing port: ' + str(e))
@@ -495,11 +515,28 @@ class canSnifferGUI(QMainWindow, canSniffer_ui.Ui_MainWindow):
         for name in nameList:
             self.portSelectorComboBox.addItem(name)
 
+    def swapTheme(self):
+        if self.swapThemeButton.text() == "Light":
+            self.currentTheme = "Light"
+            qtmodern.styles.light(QApplication.instance())
+            self.swapThemeButton.setText(QtCore.QCoreApplication.translate("MainWindow", "Dark"))
+        else:
+            self.currentTheme = "Dark"
+            qtmodern.styles.dark(QApplication.instance())
+            self.swapThemeButton.setText(QtCore.QCoreApplication.translate("MainWindow", "Light"))
+
 
 def exception_hook(exctype, value, traceback):
     print(exctype, value, traceback)
     sys._excepthook(exctype, value, traceback)
     sys.exit(1)
+
+def iconFromBase64(base64):
+    pixmap = QtGui.QPixmap()
+    pixmap.loadFromData(QtCore.QByteArray.fromBase64(base64))
+    icon = QtGui.QIcon(pixmap)
+    return icon
+
 
 def main():
     # excepthook redirect
@@ -512,6 +549,7 @@ def main():
 
     #applying dark theme
     qtmodern.styles.dark(app)
+    #qtmodern.styles.light(app)
     darked_gui = qtmodern.windows.ModernWindow(gui)
 
     # adding a grip to the top left corner to make the frameless window resizable
@@ -520,6 +558,8 @@ def main():
     sizegrip.setMaximumSize(30, 30)
     layout.addWidget(sizegrip, 50, Qt.AlignBottom | Qt.AlignRight)
     darked_gui.setLayout(layout)
+
+    darked_gui.setWindowIcon(iconFromBase64(APP_ICON))
 
     #starting the app
     darked_gui.show()
